@@ -1,0 +1,441 @@
+
+  :root{
+    --blue:#1a4d9c;
+    --white:#fdfdfd;
+    --black:#000000;
+
+    --field:#fdfdfd;
+    --field-line:rgba(26,77,156,.12);
+    --card:#ffffff;
+    --card-border:rgba(26,77,156,.25);
+    --chalk:#000000;
+    --chalk-dim:rgba(0,0,0,.6);
+    --gold:#1a4d9c;
+    --run:#1a4d9c;
+    --pass:#000000;
+    --hash:rgba(26,77,156,.35);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:
+      repeating-linear-gradient(0deg, var(--field-line) 0 2px, transparent 2px 64px),
+      var(--field);
+    color:var(--chalk);
+    font-family:'Inter',sans-serif;
+    padding-bottom:80px;
+  }
+  header{
+    padding:56px 24px 36px;
+    text-align:center;
+    border-bottom:3px solid var(--card-border);
+    position:relative;
+  }
+  header::before{
+    content:"";
+    position:absolute; top:0; left:50%;
+    width:1px; height:100%;
+    background:var(--hash);
+    opacity:.4;
+  }
+  h1{
+    font-family:'Oswald',sans-serif;
+    font-weight:700;
+    font-size:clamp(32px,5vw,54px);
+    text-transform:uppercase;
+    letter-spacing:2px;
+    margin:0 0 6px;
+    color:var(--chalk);
+  }
+  header p{
+    color:var(--chalk-dim);
+    font-size:15px;
+    margin:0;
+    letter-spacing:.5px;
+  }
+  .stat-strip{
+    display:flex;
+    justify-content:center;
+    gap:40px;
+    margin-top:26px;
+    flex-wrap:wrap;
+  }
+  .stat{
+    text-align:center;
+  }
+  .stat .num{
+    font-family:'Oswald',sans-serif;
+    font-size:34px;
+    font-weight:600;
+    color:var(--blue);
+  }
+  .stat .lbl{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:1.5px;
+    color:var(--chalk-dim);
+  }
+  main{
+    max-width:1080px;
+    margin:0 auto;
+    padding:40px 20px 0;
+  }
+  .legend{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px 22px;
+    justify-content:center;
+    background:var(--card);
+    border:1px solid var(--card-border);
+    border-radius:10px;
+    padding:16px 20px;
+    margin-bottom:44px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:13px;
+    color:var(--chalk-dim);
+  }
+  .legend b{color:var(--chalk);}
+
+  .group{
+    margin-bottom:52px;
+  }
+  .group-head{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:10px;
+    border-bottom:2px solid var(--card-border);
+    padding-bottom:10px;
+    margin-bottom:20px;
+  }
+  .group-title{
+    font-family:'Oswald',sans-serif;
+    text-transform:uppercase;
+    font-size:22px;
+    letter-spacing:1px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .group-title .n{
+    color:var(--chalk-dim);
+    font-size:15px;
+    font-weight:400;
+  }
+  .group-bar{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:13px;
+  }
+  .bar{
+    width:150px;
+    height:8px;
+    border-radius:4px;
+    overflow:hidden;
+    display:flex;
+    background:var(--hash);
+  }
+  .bar .run{background:var(--run);}
+  .bar .pass{background:var(--pass);}
+
+  .cards{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(380px,1fr));
+    gap:20px;
+  }
+  .card{
+    background:var(--card);
+    border:1px solid var(--card-border);
+    border-radius:12px;
+    padding:22px 22px 16px;
+    box-shadow:0 1px 3px rgba(26,77,156,.08);
+  }
+  .card-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:10px;
+    margin-bottom:12px;
+  }
+  .formation-box{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:rgba(26,77,156,.05);
+    border:1px solid rgba(26,77,156,.15);
+    border-radius:8px;
+    padding:10px;
+    margin-bottom:14px;
+    height:190px;
+    position:relative;
+  }
+  .formation-box svg{
+    width:100%;
+    height:100%;
+    max-width:340px;
+  }
+  .formation-box.editing{
+    background:rgba(26,77,156,.09);
+    border:1.5px dashed rgba(26,77,156,.45);
+  }
+  .edit-btn{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    font-weight:600;
+    letter-spacing:.5px;
+    text-transform:uppercase;
+    background:var(--white);
+    color:var(--blue);
+    border:1.5px solid var(--blue);
+    border-radius:6px;
+    padding:5px 10px;
+    cursor:pointer;
+    flex-shrink:0;
+    white-space:nowrap;
+  }
+  .edit-btn:hover{background:rgba(26,77,156,.08);}
+  .edit-btn.active{background:var(--blue); color:var(--white);}
+  .editor-toolbar{
+    display:none;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:6px;
+    background:rgba(26,77,156,.06);
+    border:1px solid rgba(26,77,156,.25);
+    border-radius:8px;
+    padding:10px;
+    margin-bottom:14px;
+  }
+  .editor-toolbar.show{display:flex;}
+  .editor-toolbar .grp-lbl{
+    font-size:10px;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    color:var(--chalk-dim);
+    width:100%;
+    margin-bottom:2px;
+  }
+  .add-btn{
+    width:28px; height:28px;
+    border-radius:50%;
+    border:2px solid var(--blue);
+    background:var(--white);
+    color:var(--blue);
+    font-family:'Oswald',sans-serif;
+    font-weight:600;
+    font-size:13px;
+    cursor:pointer;
+  }
+  .add-btn:hover{background:rgba(26,77,156,.12);}
+  .add-btn.o-btn{
+    width:20px; height:20px;
+    border-radius:50%;
+    background:var(--black);
+    border:2px solid var(--black);
+    color:var(--white);
+    font-size:10px;
+  }
+  .tool-action{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    font-weight:600;
+    padding:5px 10px;
+    border-radius:6px;
+    border:1.5px solid var(--black);
+    background:var(--white);
+    color:var(--black);
+    cursor:pointer;
+    margin-left:auto;
+  }
+  .tool-action:hover{background:rgba(0,0,0,.06);}
+  .tool-action.primary{
+    border-color:var(--blue);
+    color:var(--blue);
+  }
+  .tool-hint{
+    font-size:11px;
+    color:var(--chalk-dim);
+    width:100%;
+  }
+  .badge{
+    display:inline-block;
+    font-size:10px;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    padding:3px 7px;
+    border-radius:4px;
+    background:rgba(26,77,156,.10);
+    color:var(--blue);
+    border:1px solid rgba(26,77,156,.5);
+    margin-left:6px;
+  }
+  .pct-row{
+    display:flex;
+    gap:8px;
+    margin-bottom:6px;
+  }
+  .pct{
+    flex:1;
+    text-align:center;
+    border-radius:6px;
+    padding:8px 4px;
+  }
+  .pct.run{background:rgba(26,77,156,.10); border:1px solid rgba(26,77,156,.5);}
+  .pct.pass{background:rgba(0,0,0,.05); border:1px solid rgba(0,0,0,.3);}
+  .pct .p{
+    font-family:'Oswald',sans-serif;
+    font-size:22px;
+    font-weight:600;
+  }
+  .pct.run .p{color:var(--run);}
+  .pct.pass .p{color:var(--pass);}
+  .pct .l{
+    font-size:10px;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    color:var(--chalk-dim);
+  }
+  .rep-count{
+    font-size:12px;
+    color:var(--chalk-dim);
+    text-align:center;
+    margin-bottom:10px;
+  }
+
+  details{
+    border-top:1px solid var(--card-border);
+    padding-top:8px;
+  }
+  summary{
+    cursor:pointer;
+    font-size:13px;
+    font-weight:600;
+    color:var(--chalk);
+    list-style:none;
+    display:flex;
+    align-items:center;
+    gap:6px;
+    padding:4px 0;
+  }
+  summary::-webkit-details-marker{display:none;}
+  summary::before{
+    content:"▸";
+    color:var(--gold);
+    transition:transform .15s;
+    font-size:11px;
+  }
+  details[open] summary::before{
+    transform:rotate(90deg);
+  }
+  .plays{
+    margin-top:8px;
+    display:flex;
+    flex-direction:column;
+    gap:5px;
+  }
+  .play-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    background:rgba(26,77,156,.045);
+    border-radius:6px;
+    padding:6px 10px;
+    font-size:12.5px;
+  }
+  .play-row .left{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    min-width:0;
+  }
+  .game-tag{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px;
+    padding:2px 5px;
+    border-radius:3px;
+    font-weight:600;
+    flex-shrink:0;
+  }
+  .game-tag.AUG{background:var(--blue); color:var(--white);}
+  .game-tag.WCA{background:var(--black); color:var(--white);}
+  .outcome{
+    color:var(--chalk-dim);
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .outcome.run{color:var(--blue); font-weight:600;}
+  .outcome.pass{color:var(--black); font-weight:600;}
+  .outcome.unclear{color:rgba(0,0,0,.4); font-style:italic;}
+  .play-row a{
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px;
+    color:var(--white);
+    text-decoration:none;
+    background:var(--blue);
+    border:1px solid var(--blue);
+    border-radius:4px;
+    padding:2px 7px;
+    flex-shrink:0;
+    white-space:nowrap;
+  }
+  .play-row a:hover{background:#2760bd;}
+  .play-row .manual{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    color:var(--chalk-dim);
+    flex-shrink:0;
+  }
+
+  .note{
+    max-width:1080px;
+    margin:10px auto 0;
+    padding:16px 22px;
+    background:var(--card);
+    border:1px solid var(--card-border);
+    border-radius:10px;
+    font-size:13px;
+    color:var(--chalk-dim);
+    line-height:1.6;
+  }
+  .note b{color:var(--chalk);}
+  footer{
+    text-align:center;
+    color:var(--chalk-dim);
+    font-size:12px;
+    padding:40px 20px 10px;
+  }
+  @media (max-width:520px){
+    .stat-strip{gap:24px;}
+    .cards{grid-template-columns:1fr;}
+  }
+
+/* --- Added for the live editable version --- */
+.save-status{
+  font-size:11px;
+  font-family:'JetBrains Mono',monospace;
+  margin-left:8px;
+}
+.save-status.saving{color:var(--chalk-dim);}
+.save-status.saved{color:var(--blue);}
+.save-status.error{color:#b00020;}
+.top-bar{
+  position:fixed;
+  top:12px; right:16px;
+  z-index:10;
+}
+.top-bar a{
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px;
+  color:var(--chalk-dim);
+  text-decoration:none;
+  border:1px solid var(--card-border);
+  border-radius:6px;
+  padding:5px 10px;
+  background:var(--card);
+}
+.top-bar a:hover{color:var(--blue); border-color:var(--blue);}

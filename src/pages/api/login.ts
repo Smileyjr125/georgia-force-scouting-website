@@ -1,0 +1,20 @@
+import type { APIRoute } from "astro";
+
+export const POST: APIRoute = async ({ request, cookies, redirect }) => {
+  const form = await request.formData();
+  const password = form.get("password");
+
+  if (password !== import.meta.env.SITE_PASSWORD) {
+    return redirect("/login?error=1");
+  }
+
+  cookies.set("gsic_auth", "yes", {
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 30, // 30 days
+  });
+
+  return redirect("/");
+};
