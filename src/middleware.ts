@@ -9,16 +9,14 @@ export const onRequest = defineMiddleware(async (context, next) => {
   if (
     pathname === "/login" ||
     pathname === "/api/login" ||
-    pathname === "/api/logout" ||
-    pathname === "/api/debug-env" // TEMPORARY — remove along with the route itself
+    pathname === "/api/logout"
   ) {
     return next();
   }
 
   const authed = context.cookies.get(COOKIE_NAME)?.value === "yes";
   if (!authed) {
-    // TEMPORARY diagnostic — shows exactly what pathname the middleware saw.
-    return context.redirect(`/login?from=${encodeURIComponent(pathname)}`);
+    return context.redirect("/login");
   }
 
   return next();
