@@ -17,7 +17,8 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
   const authed = context.cookies.get(COOKIE_NAME)?.value === "yes";
   if (!authed) {
-    return context.redirect("/login");
+    // TEMPORARY diagnostic — shows exactly what pathname the middleware saw.
+    return context.redirect(`/login?from=${encodeURIComponent(pathname)}`);
   }
 
   return next();
