@@ -9,7 +9,8 @@
     "preview": "astro preview",
     "check": "astro check",
     "seed": "node scripts/seed-contentful.mjs",
-    "migrate:teams": "node scripts/migrate-add-teams.mjs"
+    "migrate:teams": "node scripts/migrate-add-teams.mjs",
+    "migrate:groups": "node scripts/migrate-add-groups.mjs"
   },
   "dependencies": {
     "@astrojs/netlify": "^5.5.0",

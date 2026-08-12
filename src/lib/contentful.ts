@@ -47,7 +47,31 @@ export interface GameDTO {
   videoUrl: string;
 }
 
-// Shape of a formation entry as the frontend consumes it.
+// Shape of a formation group (e.g. "Single-Back — Shotgun") entry.
+export interface GroupDTO {
+  id: string;
+  teamId: string;
+  key: string;
+  title: string;
+  order: number;
+}
+
+export async function getGroupsForTeam(teamId: string): Promise<GroupDTO[]> {
+  const client = getDeliveryClient();
+  const entries = await client.getEntries({
+    content_type: "formationGroup",
+    "fields.team.sys.id": teamId,
+    limit: 1000,
+    order: ["fields.order"] as any,
+  } as any);
+  return entries.items.map((item: any) => ({
+    id: item.sys.id,
+    teamId,
+    key: item.fields.key,
+    title: item.fields.title,
+    order: item.fields.order ?? 0,
+  }));
+}
 export interface FormationDTO {
   id: string;          // Contentful entry ID
   teamId: string;

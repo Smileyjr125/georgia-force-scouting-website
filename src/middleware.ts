@@ -9,7 +9,8 @@ export const onRequest = defineMiddleware(async (context, next) => {
   if (
     pathname === "/login" ||
     pathname === "/api/login" ||
-    pathname === "/api/logout"
+    pathname === "/api/logout" ||
+    pathname === "/api/debug-env" // TEMPORARY — remove along with the route itself
   ) {
     return next();
   }

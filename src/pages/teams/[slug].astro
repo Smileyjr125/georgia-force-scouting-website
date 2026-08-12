@@ -1,6 +1,6 @@
 ---
 import "../../styles/site.css";
-import { getTeamBySlug, getFormationsForTeam, getGamesForTeam } from "../../lib/contentful";
+import { getTeamBySlug, getFormationsForTeam, getGamesForTeam, getGroupsForTeam } from "../../lib/contentful";
 
 const { slug } = Astro.params;
 const team = slug ? await getTeamBySlug(slug) : null;
@@ -9,16 +9,24 @@ if (!team) {
   return new Response(null, { status: 404, statusText: "Team not found" });
 }
 
-const [formations, games] = await Promise.all([
+const [formations, games, groupEntries] = await Promise.all([
   getFormationsForTeam(team.id),
   getGamesForTeam(team.id),
+  getGroupsForTeam(team.id),
 ]);
 
-// Group formations by groupKey, preserving groupOrder / sheetOrder from Contentful.
+// Groups are now real Contentful entries (not derived from formations), so
+// a team can have a group with zero formations in it — which is exactly
+// what a brand-new formation type looks like right after you create it.
 const groupMap = new Map<string, { key: string; title: string; order: number; formations: typeof formations }>();
+for (const g of groupEntries) {
+  groupMap.set(g.key, { key: g.key, title: g.title, order: g.order, formations: [] });
+}
 for (const f of formations) {
   if (!groupMap.has(f.groupKey)) {
-    groupMap.set(f.groupKey, { key: f.groupKey, title: f.groupTitle, order: f.groupOrder, formations: [] });
+    // Defensive fallback: a formation whose group entry is somehow missing
+    // still shows up, rather than silently disappearing.
+    groupMap.set(f.groupKey, { key: f.groupKey, title: f.groupTitle || f.groupKey, order: f.groupOrder ?? 9999, formations: [] });
   }
   groupMap.get(f.groupKey)!.formations.push(f);
 }
@@ -106,6 +114,17 @@ for (const f of formations) {
     </details>
 
     <div id="groups"></div>
+
+    <div class="add-group-panel">
+      <button id="add-group-btn" class="tool-action primary" type="button">+ Add Formation Type</button>
+      <span class="tool-hint">e.g. "Single-Back — Shotgun (Q ahead of H)", "Trips Right", "Goal Line"</span>
+      <form id="add-group-form" class="inline-form" style="display:none;">
+        <input type="text" id="group-title-input" placeholder="Formation type name" required />
+        <button type="submit" class="tool-action primary">Create</button>
+        <button type="button" id="add-group-cancel" class="tool-action">Cancel</button>
+        <span id="add-group-status" class="save-status"></span>
+      </form>
+    </div>
   </main>
 
   <div class="note">
@@ -141,6 +160,40 @@ for (const f of formations) {
     function supportsDeepLink(gameTag) {
       return GAMES_BY_TAG[gameTag]?.videoPlatform === "youtube";
     }
+
+    // ---- Add Formation Type (group) ----
+    const addGroupBtn = document.getElementById("add-group-btn");
+    const addGroupForm = document.getElementById("add-group-form");
+    const groupTitleInput = document.getElementById("group-title-input");
+    addGroupBtn.addEventListener("click", () => {
+      addGroupForm.style.display = addGroupForm.style.display === "none" ? "flex" : "none";
+      if (addGroupForm.style.display === "flex") groupTitleInput.focus();
+    });
+    document.getElementById("add-group-cancel").addEventListener("click", () => {
+      addGroupForm.reset();
+      addGroupForm.style.display = "none";
+    });
+    addGroupForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const title = groupTitleInput.value.trim();
+      if (!title) return;
+      const status = document.getElementById("add-group-status");
+      status.textContent = "Creating…";
+      status.className = "save-status saving";
+      try {
+        const res = await fetch("/api/groups", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ teamId: TEAM_ID, title }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to create formation type");
+        location.reload();
+      } catch (err) {
+        status.textContent = "Error: " + err.message;
+        status.className = "save-status error";
+      }
+    });
 
     // ---- Games management panel ----
     document.getElementById("add-game-form").addEventListener("submit", async (e) => {

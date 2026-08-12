@@ -21,6 +21,22 @@ the changes save for everyone, instantly.
 Nothing here costs money at this scale — Contentful, Netlify, and this
 Astro setup are all free at your traffic level.
 
+### If you've already deployed and just pulled this update
+
+Formation "types" (Single-Back, Pistol, Empty, Two-Back, etc.) used to only
+exist implicitly, inferred from whatever formations happened to reference
+them — which meant a brand-new team with zero formations had nowhere for a
+type to "come from." Run this once to fix that:
+
+```bash
+npm run migrate:groups
+```
+
+Safe to run more than once. It creates a real `formationGroup` content
+type and backfills one entry per formation type your existing teams
+already use, so nothing changes visually — it just gives new teams
+somewhere to start from now.
+
 ### If you're setting this up for the first time
 
 Follow steps 1–5 below in order.
@@ -142,28 +158,36 @@ variables in the Netlify dashboard before the first deploy.
 **Scouting a new opponent:** go to the landing page, type their name into
 "Add a new team," and you're dropped straight into their (empty) sheet.
 
+**Adding a formation type to a team:** on that team's sheet, scroll to the
+bottom and click "+ Add Formation Type." Name it (e.g. "Trips Right" or
+"Goal Line") and it appears as a new section, ready for its first
+formation.
+
 **Adding a formation to a team:** on that team's sheet, scroll to the
-group it belongs in (Single-Back, Pistol, Empty, Two-Back) and click the
-dashed "+ Add Formation" tile. Give it a label — it starts as just a lone
-QB circle, which you then drag/add positions to using Edit mode, same as
-any other formation.
+group it belongs in and click the dashed "+ Add Formation" tile. Give it
+a label — it starts as just a lone QB circle, which you then drag/add
+positions to using Edit mode, same as any other formation.
 
 **Editing formations:** click **Edit** on any formation card, drag players
 around (they snap to an invisible grid), add or remove positions with the
 toolbar, then hit **Save & Done**. Writes straight to Contentful, live
 immediately for your whole staff — no rebuild or redeploy needed.
 
-**Adding charted plays (timestamps/outcomes) to a formation:** this part
-still goes through Contentful directly for now (Content model → Formation
-→ find the entry → edit the `plays` field, which is a JSON array shaped
-like `{"t": "12:34", "game": "AUG", "outcome": "run", "label": "Run (L)"}`).
-Building a proper on-site UI for this is a reasonable next step if you
-want it — just ask.
+**Adding charted plays (timestamps/outcomes) to a formation:** click "+ Add
+Play" at the bottom of any formation's timestamp list — pick the video
+source, type the timestamp, choose run/pass/unclear, and give it a short
+label. Every existing play has **✎** (edit) and **×** (delete) buttons
+right next to it. All of it saves live, no reload needed.
 
-**Adding a new game/video source to an existing team:** create a new
-entry under the "Game" content type in Contentful: link it to the team,
-give it a short `tag` (used to match plays to it, e.g. `"HOM"` for a
-Homecoming game), a `label`, `videoPlatform` (`youtube`, `nfhs`, or
-`other`), and `videoUrl`. Any play whose `game` field matches that tag
-will automatically link to it.
+**Adding a new video source to a team:** click "Manage video sources" near
+the top of the sheet, then "Add Video Source." Give it a short tag (used
+to match plays to it, e.g. `HOM` for a Homecoming game), a label, the
+platform (YouTube, NFHS, or other), and the URL. Any play tagged with that
+same code will automatically link to it. Existing sources can be edited or
+deleted from that same panel.
+
+At this point you should never need to open the Contentful dashboard for
+day-to-day scouting — teams, formation types, formations, plays, and video
+sources are all managed from the site itself. Contentful is just the
+database sitting underneath.
 

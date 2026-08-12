@@ -566,3 +566,29 @@
   flex-shrink:0;
 }
 .add-play-toggle{margin-top:10px;}
+
+.add-group-panel .inline-form .tool-action,
+.play-form .tool-action,
+#add-game-form .tool-action{
+  margin-left:0;
+}
+
+.add-group-panel{
+  margin-top:8px;
+  padding:18px;
+  border:2px dashed rgba(26,77,156,.3);
+  border-radius:10px;
+  text-align:center;
+}
+.add-group-panel .tool-hint{
+  display:block;
+  margin-top:8px;
+  text-align:center;
+}
+.add-group-panel .inline-form{
+  justify-content:center;
+  margin-top:14px;
+}
+.add-group-panel #group-title-input{
+  min-width:280px;
+}
