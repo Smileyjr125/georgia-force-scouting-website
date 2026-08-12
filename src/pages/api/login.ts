@@ -2,9 +2,10 @@ import type { APIRoute } from "astro";
 
 export const POST: APIRoute = async ({ request, cookies, redirect }) => {
   const form = await request.formData();
-  const password = form.get("password");
+  const password = (form.get("password") ?? "").toString().trim();
+  const expected = (import.meta.env.SITE_PASSWORD ?? "").toString().trim();
 
-  if (password !== import.meta.env.SITE_PASSWORD) {
+  if (!expected || password !== expected) {
     return redirect("/login?error=1");
   }
 

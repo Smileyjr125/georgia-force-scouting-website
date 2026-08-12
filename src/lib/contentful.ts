@@ -30,9 +30,26 @@ export async function getManagementEnvironment() {
   return space.getEnvironment("master");
 }
 
+// Shape of a team (opponent) entry.
+export interface TeamDTO {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+}
+
+// Shape of a game (a piece of film for a team) entry.
+export interface GameDTO {
+  tag: string;            // short code used in play data, e.g. "AUG"
+  label: string;
+  videoPlatform: "youtube" | "nfhs" | "other";
+  videoUrl: string;
+}
+
 // Shape of a formation entry as the frontend consumes it.
 export interface FormationDTO {
   id: string;          // Contentful entry ID
+  teamId: string;
   label: string;
   groupKey: string;
   groupTitle: string;
@@ -43,6 +60,78 @@ export interface FormationDTO {
   plays: { t: string; game: string; outcome: string; label: string }[];
 }
 
+export async function getAllTeams(): Promise<TeamDTO[]> {
+  const client = getDeliveryClient();
+  const entries = await client.getEntries({
+    content_type: "team",
+    limit: 1000,
+    order: ["fields.name"] as any,
+  });
+  return entries.items.map((item: any) => ({
+    id: item.sys.id,
+    name: item.fields.name,
+    slug: item.fields.slug,
+    description: item.fields.description ?? "",
+  }));
+}
+
+export async function getTeamBySlug(slug: string): Promise<TeamDTO | null> {
+  const client = getDeliveryClient();
+  const entries = await client.getEntries({
+    content_type: "team",
+    "fields.slug": slug,
+    limit: 1,
+  } as any);
+  if (entries.items.length === 0) return null;
+  const item: any = entries.items[0];
+  return {
+    id: item.sys.id,
+    name: item.fields.name,
+    slug: item.fields.slug,
+    description: item.fields.description ?? "",
+  };
+}
+
+export async function getGamesForTeam(teamId: string): Promise<GameDTO[]> {
+  const client = getDeliveryClient();
+  const entries = await client.getEntries({
+    content_type: "game",
+    "fields.team.sys.id": teamId,
+    limit: 1000,
+  } as any);
+  return entries.items.map((item: any) => ({
+    tag: item.fields.tag,
+    label: item.fields.label,
+    videoPlatform: item.fields.videoPlatform,
+    videoUrl: item.fields.videoUrl,
+  }));
+}
+
+export async function getFormationsForTeam(teamId: string): Promise<FormationDTO[]> {
+  const client = getDeliveryClient();
+  const entries = await client.getEntries({
+    content_type: "formation",
+    "fields.team.sys.id": teamId,
+    limit: 1000,
+    order: ["fields.groupOrder", "fields.sheetOrder"] as any,
+  } as any);
+
+  return entries.items.map((item: any) => ({
+    id: item.sys.id,
+    teamId,
+    label: item.fields.label,
+    groupKey: item.fields.groupKey,
+    groupTitle: item.fields.groupTitle,
+    groupOrder: item.fields.groupOrder ?? 0,
+    sheetOrder: item.fields.sheetOrder ?? 0,
+    badges: item.fields.badges ?? [],
+    positions: item.fields.positions ?? [],
+    plays: item.fields.plays ?? [],
+  }));
+}
+
+// Legacy helper (kept for reference/back-compat) — fetches every formation
+// across every team, unfiltered.
 export async function getAllFormations(): Promise<FormationDTO[]> {
   const client = getDeliveryClient();
   const entries = await client.getEntries({
@@ -53,6 +142,7 @@ export async function getAllFormations(): Promise<FormationDTO[]> {
 
   return entries.items.map((item: any) => ({
     id: item.sys.id,
+    teamId: item.fields.team?.sys?.id ?? "",
     label: item.fields.label,
     groupKey: item.fields.groupKey,
     groupTitle: item.fields.groupTitle,

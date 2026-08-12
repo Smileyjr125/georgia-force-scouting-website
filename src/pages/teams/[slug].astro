@@ -1,0 +1,460 @@
+---
+import "../../styles/site.css";
+import { getTeamBySlug, getFormationsForTeam, getGamesForTeam } from "../../lib/contentful";
+
+const { slug } = Astro.params;
+const team = slug ? await getTeamBySlug(slug) : null;
+
+if (!team) {
+  return new Response(null, { status: 404, statusText: "Team not found" });
+}
+
+const [formations, games] = await Promise.all([
+  getFormationsForTeam(team.id),
+  getGamesForTeam(team.id),
+]);
+
+// Group formations by groupKey, preserving groupOrder / sheetOrder from Contentful.
+const groupMap = new Map<string, { key: string; title: string; order: number; formations: typeof formations }>();
+for (const f of formations) {
+  if (!groupMap.has(f.groupKey)) {
+    groupMap.set(f.groupKey, { key: f.groupKey, title: f.groupTitle, order: f.groupOrder, formations: [] });
+  }
+  groupMap.get(f.groupKey)!.formations.push(f);
+}
+const groups = [...groupMap.values()].sort((a, b) => a.order - b.order);
+
+// Header stats, computed live from whatever is currently in Contentful.
+let totalRun = 0, totalPass = 0, totalPlays = 0;
+for (const f of formations) {
+  for (const p of f.plays) {
+    totalPlays++;
+    if (p.outcome === "run") totalRun++;
+    else if (p.outcome === "pass") totalPass++;
+  }
+}
+---
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{team.name} Formation Sheet</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet"
+  />
+</head>
+<body>
+  <div class="top-bar">
+    <a href="/">← All teams</a>
+    <a href="/api/logout">Log out</a>
+  </div>
+
+  <header>
+    <h1>{team.name} Formation Sheet</h1>
+    <p>{team.description || `Combined charting across ${games.length} game${games.length === 1 ? "" : "s"}`}</p>
+    <div class="stat-strip">
+      <div class="stat"><div class="num">{totalPlays}</div><div class="lbl">Plays Charted</div></div>
+      <div class="stat"><div class="num">{totalRun}</div><div class="lbl">Run</div></div>
+      <div class="stat"><div class="num">{totalPass}</div><div class="lbl">Pass</div></div>
+      <div class="stat"><div class="num">{formations.length}</div><div class="lbl">Formations</div></div>
+    </div>
+  </header>
+
+  <main>
+    <div class="legend">
+      <span><b>X</b> = TE (left)</span>
+      <span><b>Y</b> = TE (right)</span>
+      <span><b>Z</b> = WR (left)</span>
+      <span><b>A</b> = WR (right)</span>
+      <span><b>H</b> = Halfback</span>
+      <span><b>Q</b> = QB</span>
+      <span><b>O</b> = Line</span>
+      <span><b>flip</b> = mirrored concept, other side</span>
+    </div>
+
+    <div id="groups"></div>
+  </main>
+
+  <div class="note">
+    <b>Video links:</b> YouTube-hosted games link directly to the exact moment. Games hosted elsewhere (like NFHS Network) don't support direct timestamp links — those entries link to the game page and list the time to seek to manually.
+    <br /><br />
+    <b>Editing:</b> click "Edit" on any formation card to move players, add or remove positions, and save. Changes save straight to Contentful and are live for your whole coaching staff.
+  </div>
+
+  <footer>Built from hand-charted film — update the source data in Contentful as more games are logged.</footer>
+
+  <script type="application/json" id="formation-data" set:html={JSON.stringify(groups)} />
+  <script type="application/json" id="games-data" set:html={JSON.stringify(games)} />
+
+  <script define:vars={{ TEAM_ID: team.id }}>
+    // games: [{tag, label, videoPlatform, videoUrl}, ...] — fetched per-team from Contentful.
+    const GAMES = JSON.parse(document.getElementById("games-data").textContent);
+    const GAMES_BY_TAG = Object.fromEntries(GAMES.map((g) => [g.tag, g]));
+
+    function toSeconds(t) {
+      const parts = t.split(":").map(Number);
+      if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+      return parts[0] * 60 + parts[1];
+    }
+    function videoLink(gameTag, t) {
+      const g = GAMES_BY_TAG[gameTag];
+      if (!g) return "#";
+      if (g.videoPlatform === "youtube") {
+        const sep = g.videoUrl.includes("?") ? "&" : "?";
+        return `${g.videoUrl}${sep}t=${toSeconds(t)}s`;
+      }
+      return g.videoUrl; // nfhs / other — no deep-link support, open the base page
+    }
+    function supportsDeepLink(gameTag) {
+      return GAMES_BY_TAG[gameTag]?.videoPlatform === "youtube";
+    }
+
+    // ---- Fixed editor canvas + invisible snap grid ----
+    const CANVAS_W = 340;
+    const CANVAS_H = 200;
+    const GRID = 34;
+    const MARGIN = 20;
+
+    function snap(v, max) {
+      let s = Math.round((v - MARGIN) / GRID) * GRID + MARGIN;
+      return Math.max(MARGIN, Math.min(max - MARGIN, s));
+    }
+
+    function renderFormationSVG(box, positions, editable, selectedRef) {
+      box.innerHTML = "";
+      box.classList.toggle("editing", !!editable);
+
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("viewBox", `0 0 ${CANVAS_W} ${CANVAS_H}`);
+
+      if (editable) {
+        for (let gx = MARGIN; gx <= CANVAS_W - MARGIN; gx += GRID) {
+          for (let gy = MARGIN; gy <= CANVAS_H - MARGIN; gy += GRID) {
+            const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            dot.setAttribute("cx", gx); dot.setAttribute("cy", gy);
+            dot.setAttribute("r", 1.4);
+            dot.setAttribute("fill", "#1a4d9c");
+            dot.setAttribute("fill-opacity", "0.25");
+            svg.appendChild(dot);
+          }
+        }
+      }
+
+      const losToken = positions.find((p) => p.char === "O");
+      if (losToken) {
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        line.setAttribute("x1", 4); line.setAttribute("x2", CANVAS_W - 4);
+        line.setAttribute("y1", losToken.y); line.setAttribute("y2", losToken.y);
+        line.setAttribute("stroke", "#1a4d9c");
+        line.setAttribute("stroke-opacity", "0.28");
+        line.setAttribute("stroke-width", "2");
+        line.setAttribute("stroke-dasharray", "5,5");
+        svg.appendChild(line);
+      }
+
+      positions.forEach((pos) => {
+        const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        g.style.cursor = editable ? "grab" : "default";
+
+        const isO = pos.char === "O";
+        const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        circle.setAttribute("cx", pos.x);
+        circle.setAttribute("cy", pos.y);
+        circle.setAttribute("r", isO ? 8 : 16);
+        circle.setAttribute("fill", isO ? "#000000" : "#fdfdfd");
+        if (!isO) {
+          circle.setAttribute("stroke", "#1a4d9c");
+          circle.setAttribute("stroke-width", "2.5");
+        }
+        g.appendChild(circle);
+
+        if (!isO) {
+          const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+          text.setAttribute("x", pos.x);
+          text.setAttribute("y", pos.y);
+          text.setAttribute("text-anchor", "middle");
+          text.setAttribute("dominant-baseline", "central");
+          text.setAttribute("font-family", "Oswald, sans-serif");
+          text.setAttribute("font-weight", "600");
+          text.setAttribute("font-size", "16");
+          text.setAttribute("fill", "#1a4d9c");
+          text.textContent = pos.char;
+          g.appendChild(text);
+        }
+
+        if (selectedRef && selectedRef.id === pos.id) {
+          const ring = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+          ring.setAttribute("cx", pos.x);
+          ring.setAttribute("cy", pos.y);
+          ring.setAttribute("r", (isO ? 8 : 16) + 5);
+          ring.setAttribute("fill", "none");
+          ring.setAttribute("stroke", "#1a4d9c");
+          ring.setAttribute("stroke-width", "2");
+          ring.setAttribute("stroke-dasharray", "3,3");
+          g.insertBefore(ring, circle);
+        }
+
+        if (editable) {
+          let dragging = false;
+          const getSvgPoint = (evt) => {
+            const rect = svg.getBoundingClientRect();
+            const scaleX = CANVAS_W / rect.width;
+            const scaleY = CANVAS_H / rect.height;
+            return { x: (evt.clientX - rect.left) * scaleX, y: (evt.clientY - rect.top) * scaleY };
+          };
+          g.addEventListener("pointerdown", (evt) => {
+            evt.stopPropagation();
+            dragging = true;
+            g.setPointerCapture(evt.pointerId);
+            g.style.cursor = "grabbing";
+            if (selectedRef) { selectedRef.id = pos.id; renderFormationSVG(box, positions, true, selectedRef); }
+          });
+          g.addEventListener("pointermove", (evt) => {
+            if (!dragging) return;
+            const pt = getSvgPoint(evt);
+            pos.x = snap(pt.x, CANVAS_W);
+            pos.y = snap(pt.y, CANVAS_H);
+            circle.setAttribute("cx", pos.x);
+            circle.setAttribute("cy", pos.y);
+            const txt = g.querySelector("text");
+            if (txt) { txt.setAttribute("x", pos.x); txt.setAttribute("y", pos.y); }
+          });
+          const endDrag = () => {
+            if (!dragging) return;
+            dragging = false;
+            g.style.cursor = "grab";
+            renderFormationSVG(box, positions, true, selectedRef);
+          };
+          g.addEventListener("pointerup", endDrag);
+          g.addEventListener("pointercancel", endDrag);
+        }
+
+        svg.appendChild(g);
+      });
+
+      box.appendChild(svg);
+    }
+
+    function tallyPlays(plays) {
+      let run = 0, pass = 0, unclear = 0;
+      plays.forEach((p) => {
+        if (p.outcome === "run") run++;
+        else if (p.outcome === "pass") pass++;
+        else unclear++;
+      });
+      return { run, pass, unclear, total: run + pass };
+    }
+
+    async function saveFormation(formationId, positions, statusEl) {
+      statusEl.textContent = "Saving…";
+      statusEl.className = "save-status saving";
+      try {
+        const res = await fetch(`/api/formations/${formationId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ positions }),
+        });
+        if (!res.ok) throw new Error((await res.json()).error || "Save failed");
+        statusEl.textContent = "Saved ✓";
+        statusEl.className = "save-status saved";
+        setTimeout(() => { statusEl.textContent = ""; }, 2500);
+      } catch (err) {
+        statusEl.textContent = "Error saving — try again";
+        statusEl.className = "save-status error";
+      }
+    }
+
+    const groups = JSON.parse(document.getElementById("formation-data").textContent);
+    const container = document.getElementById("groups");
+
+    groups.forEach((group) => {
+      let groupRun = 0, groupPass = 0;
+      group.formations.forEach((f) => {
+        const t = tallyPlays(f.plays);
+        groupRun += t.run;
+        groupPass += t.pass;
+      });
+      const groupTotal = groupRun + groupPass;
+      const runPct = groupTotal ? Math.round((groupRun / groupTotal) * 100) : 0;
+      const passPct = groupTotal ? 100 - runPct : 0;
+
+      const section = document.createElement("section");
+      section.className = "group";
+
+      const head = document.createElement("div");
+      head.className = "group-head";
+      head.innerHTML = `
+        <div class="group-title">${group.title} <span class="n">${groupTotal} plays</span></div>
+        <div class="group-bar">
+          <span style="color:var(--run)">${runPct}% Run</span>
+          <div class="bar"><div class="run" style="width:${runPct}%"></div><div class="pass" style="width:${passPct}%"></div></div>
+          <span style="color:var(--pass)">${passPct}% Pass</span>
+        </div>
+      `;
+      section.appendChild(head);
+
+      const cardsWrap = document.createElement("div");
+      cardsWrap.className = "cards";
+
+      group.formations.forEach((f) => {
+        const t = tallyPlays(f.plays);
+        const rPct = t.total ? Math.round((t.run / t.total) * 100) : 0;
+        const pPct = t.total ? 100 - rPct : 0;
+
+        const selection = { id: null };
+        let editMode = false;
+        let nextLocalId = Math.max(0, ...f.positions.map((p) => p.id)) + 1;
+
+        const card = document.createElement("div");
+        card.className = "card";
+
+        const badgesHtml = f.badges.map((b) => `<span class="badge">${b}</span>`).join("");
+
+        let pctHtml;
+        if (t.total === 0) {
+          pctHtml = `<div class="rep-count">No confirmed outcome logged yet</div>`;
+        } else {
+          pctHtml = `
+            <div class="pct-row">
+              <div class="pct run"><div class="p">${rPct}%</div><div class="l">Run</div></div>
+              <div class="pct pass"><div class="p">${pPct}%</div><div class="l">Pass</div></div>
+            </div>
+            <div class="rep-count">${t.total} confirmed rep${t.total === 1 ? "" : "s"}${t.unclear ? ` · ${t.unclear} unclear` : ""}</div>
+          `;
+        }
+
+        const playsHtml = f.plays.map((p) => {
+          const outcomeClass = p.outcome === "unclear" ? "unclear" : p.outcome;
+          const linkHtml = supportsDeepLink(p.game)
+            ? `<a href="${videoLink(p.game, p.t)}" target="_blank" rel="noopener">▶ ${p.t}</a>`
+            : `<span class="manual">${p.t} (seek manually) <a href="${videoLink(p.game, p.t)}" target="_blank" rel="noopener">open</a></span>`;
+          return `
+            <div class="play-row">
+              <div class="left">
+                <span class="game-tag ${p.game}">${p.game}</span>
+                <span class="outcome ${outcomeClass}">${p.label}</span>
+              </div>
+              ${linkHtml}
+            </div>
+          `;
+        }).join("");
+
+        card.innerHTML = `
+          <div class="card-top">
+            <div>
+              <strong>${f.label}</strong>
+              ${badgesHtml}
+            </div>
+            <div style="display:flex;align-items:center;">
+              <button class="edit-btn">Edit</button>
+              <span class="save-status"></span>
+            </div>
+          </div>
+          <div class="formation-box"></div>
+          <div class="editor-toolbar">
+            <span class="grp-lbl">Add position</span>
+            <button class="add-btn" data-add="X">X</button>
+            <button class="add-btn" data-add="Y">Y</button>
+            <button class="add-btn" data-add="Z">Z</button>
+            <button class="add-btn" data-add="A">A</button>
+            <button class="add-btn" data-add="Q">Q</button>
+            <button class="add-btn" data-add="H">H</button>
+            <button class="add-btn o-btn" data-add="O">O</button>
+            <button class="tool-action" data-remove="1">Remove Selected</button>
+            <button class="tool-action primary" data-done="1">Save &amp; Done</button>
+            <span class="tool-hint">Drag a circle to move it — it'll snap to the grid. Click a circle, then "Remove Selected" to delete it.</span>
+          </div>
+          ${pctHtml}
+          <details>
+            <summary>Timestamps (${f.plays.length})</summary>
+            <div class="plays">${playsHtml}</div>
+          </details>
+        `;
+
+        const box = card.querySelector(".formation-box");
+        const toolbar = card.querySelector(".editor-toolbar");
+        const editBtn = card.querySelector(".edit-btn");
+        const statusEl = card.querySelector(".save-status");
+
+        function redraw() {
+          renderFormationSVG(box, f.positions, editMode, editMode ? selection : null);
+        }
+        redraw();
+
+        editBtn.addEventListener("click", () => {
+          editMode = !editMode;
+          editBtn.classList.toggle("active", editMode);
+          editBtn.textContent = editMode ? "Editing…" : "Edit";
+          toolbar.classList.toggle("show", editMode);
+          if (!editMode) selection.id = null;
+          redraw();
+        });
+
+        toolbar.querySelectorAll("[data-add]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const char = btn.getAttribute("data-add");
+            f.positions.push({ id: nextLocalId++, char, x: snap(CANVAS_W / 2, CANVAS_W), y: snap(CANVAS_H / 2, CANVAS_H) });
+            redraw();
+          });
+        });
+
+        toolbar.querySelector("[data-remove]").addEventListener("click", () => {
+          if (selection.id == null) return;
+          f.positions = f.positions.filter((p) => p.id !== selection.id);
+          selection.id = null;
+          redraw();
+        });
+
+        toolbar.querySelector("[data-done]").addEventListener("click", async () => {
+          editMode = false;
+          editBtn.classList.remove("active");
+          editBtn.textContent = "Edit";
+          toolbar.classList.remove("show");
+          selection.id = null;
+          redraw();
+          await saveFormation(f.id, f.positions, statusEl);
+        });
+
+        cardsWrap.appendChild(card);
+      });
+
+      // "+ Add Formation" tile at the end of each group's card grid.
+      const addCard = document.createElement("div");
+      addCard.className = "card add-formation-card";
+      addCard.innerHTML = `<span>+ Add Formation</span>`;
+      addCard.addEventListener("click", async () => {
+        const label = prompt("Label for the new formation (e.g. \"Trips Right, Empty\"):");
+        if (!label || !label.trim()) return;
+        addCard.style.opacity = "0.5";
+        addCard.style.pointerEvents = "none";
+        try {
+          const res = await fetch("/api/formations", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              teamId: TEAM_ID,
+              groupKey: group.key,
+              groupTitle: group.title,
+              groupOrder: group.order ?? 0,
+              label: label.trim(),
+            }),
+          });
+          if (!res.ok) throw new Error((await res.json()).error || "Failed to create formation");
+          location.reload();
+        } catch (err) {
+          alert("Couldn't create the formation: " + err.message);
+          addCard.style.opacity = "1";
+          addCard.style.pointerEvents = "auto";
+        }
+      });
+      cardsWrap.appendChild(addCard);
+
+      section.appendChild(cardsWrap);
+      container.appendChild(section);
+    });
+  </script>
+</body>
+</html>

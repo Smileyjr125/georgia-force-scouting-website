@@ -362,6 +362,9 @@
   }
   .game-tag.AUG{background:var(--blue); color:var(--white);}
   .game-tag.WCA{background:var(--black); color:var(--white);}
+  /* Fallback for any future team's game tags — since tag values are now
+     user-defined per team, we can't hardcode a class per tag anymore. */
+  .game-tag:not(.AUG):not(.WCA){background:var(--blue); color:var(--white);}
   .outcome{
     color:var(--chalk-dim);
     overflow:hidden;
@@ -427,6 +430,8 @@
   position:fixed;
   top:12px; right:16px;
   z-index:10;
+  display:flex;
+  gap:8px;
 }
 .top-bar a{
   font-family:'JetBrains Mono',monospace;
@@ -439,3 +444,21 @@
   background:var(--card);
 }
 .top-bar a:hover{color:var(--blue); border-color:var(--blue);}
+
+.add-formation-card{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height:120px;
+  cursor:pointer;
+  border:2px dashed rgba(26,77,156,.35) !important;
+  background:rgba(26,77,156,.03) !important;
+  color:var(--blue);
+  font-family:'Oswald',sans-serif;
+  font-weight:600;
+  text-transform:uppercase;
+  letter-spacing:1px;
+  font-size:14px;
+  transition:background .15s;
+}
+.add-formation-card:hover{background:rgba(26,77,156,.08) !important;}

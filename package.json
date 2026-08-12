@@ -7,20 +7,19 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "seed": "node scripts/seed-contentful.mjs"
+    "check": "astro check",
+    "seed": "node scripts/seed-contentful.mjs",
+    "migrate:teams": "node scripts/migrate-add-teams.mjs"
   },
   "dependencies": {
-    "astro": "^4.16.0",
     "@astrojs/netlify": "^5.5.0",
+    "astro": "^4.16.0",
     "contentful": "^10.15.0",
     "contentful-management": "^11.31.0"
   },
   "devDependencies": {
-    "dotenv": "^16.4.5"
-  },
-  "allowScripts": {
-    "esbuild@0.21.5": true,
-    "fsevents@2.3.3": true,
-    "sharp@0.33.5": true
+    "@astrojs/check": "^0.9.10",
+    "dotenv": "^16.4.5",
+    "typescript": "^5.9.3"
   }
 }
