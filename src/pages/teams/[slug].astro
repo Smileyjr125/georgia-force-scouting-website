@@ -75,6 +75,36 @@ for (const f of formations) {
       <span><b>flip</b> = mirrored concept, other side</span>
     </div>
 
+    <details class="games-panel">
+      <summary>Manage video sources ({games.length})</summary>
+      <div id="games-list">
+        {games.map((g) => (
+          <div class="game-row" data-game-id={g.id}>
+            <span class="game-row-tag">{g.tag}</span>
+            <span class="game-row-label">{g.label}</span>
+            <span class="game-row-platform">{g.videoPlatform}</span>
+            <a class="game-row-url" href={g.videoUrl} target="_blank" rel="noopener">{g.videoUrl}</a>
+            <button class="tiny-btn" data-edit-game={g.id}>Edit</button>
+            <button class="tiny-btn danger" data-delete-game={g.id}>Delete</button>
+          </div>
+        ))}
+        {games.length === 0 && <p class="tool-hint">No video sources yet — add the first one below.</p>}
+      </div>
+
+      <form id="add-game-form" class="inline-form">
+        <input type="text" id="game-tag" placeholder="Tag (e.g. AUG)" maxlength="12" required />
+        <input type="text" id="game-label" placeholder="Label (e.g. vs. Augusta Eagles)" required />
+        <select id="game-platform">
+          <option value="youtube">YouTube</option>
+          <option value="nfhs">NFHS Network</option>
+          <option value="other">Other</option>
+        </select>
+        <input type="text" id="game-url" placeholder="Video URL" required />
+        <button type="submit" class="tool-action primary">Add Video Source</button>
+        <span id="add-game-status" class="save-status"></span>
+      </form>
+    </details>
+
     <div id="groups"></div>
   </main>
 
@@ -111,6 +141,78 @@ for (const f of formations) {
     function supportsDeepLink(gameTag) {
       return GAMES_BY_TAG[gameTag]?.videoPlatform === "youtube";
     }
+
+    // ---- Games management panel ----
+    document.getElementById("add-game-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const status = document.getElementById("add-game-status");
+      const tag = document.getElementById("game-tag").value.trim();
+      const label = document.getElementById("game-label").value.trim();
+      const videoPlatform = document.getElementById("game-platform").value;
+      const videoUrl = document.getElementById("game-url").value.trim();
+      if (!tag || !label || !videoUrl) return;
+
+      status.textContent = "Saving…";
+      status.className = "save-status saving";
+      try {
+        const res = await fetch("/api/games", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ teamId: TEAM_ID, tag, label, videoPlatform, videoUrl }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to add video source");
+        location.reload();
+      } catch (err) {
+        status.textContent = "Error: " + err.message;
+        status.className = "save-status error";
+      }
+    });
+
+    document.getElementById("games-list").addEventListener("click", async (e) => {
+      const editId = e.target.getAttribute("data-edit-game");
+      const deleteId = e.target.getAttribute("data-delete-game");
+
+      if (editId) {
+        const g = GAMES.find((x) => x.id === editId);
+        if (!g) return;
+        const tag = prompt("Tag:", g.tag);
+        if (tag === null) return;
+        const label = prompt("Label:", g.label);
+        if (label === null) return;
+        const videoPlatform = prompt("Platform (youtube / nfhs / other):", g.videoPlatform);
+        if (videoPlatform === null) return;
+        const videoUrl = prompt("Video URL:", g.videoUrl);
+        if (videoUrl === null) return;
+
+        try {
+          const res = await fetch(`/api/games/${editId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ tag: tag.trim(), label: label.trim(), videoPlatform: videoPlatform.trim(), videoUrl: videoUrl.trim() }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Failed to save");
+          location.reload();
+        } catch (err) {
+          alert("Couldn't save: " + err.message);
+        }
+      }
+
+      if (deleteId) {
+        const g = GAMES.find((x) => x.id === deleteId);
+        if (!g) return;
+        if (!confirm(`Delete video source "${g.label}"? Any plays tagged "${g.tag}" will lose their video link until you re-tag them.`)) return;
+        try {
+          const res = await fetch(`/api/games/${deleteId}`, { method: "DELETE" });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Failed to delete");
+          location.reload();
+        } catch (err) {
+          alert("Couldn't delete: " + err.message);
+        }
+      }
+    });
 
     // ---- Fixed editor canvas + invisible snap grid ----
     const CANVAS_W = 340;
@@ -210,7 +312,7 @@ for (const f of formations) {
             dragging = true;
             g.setPointerCapture(evt.pointerId);
             g.style.cursor = "grabbing";
-            if (selectedRef) { selectedRef.id = pos.id; renderFormationSVG(box, positions, true, selectedRef); }
+            if (selectedRef) { selectedRef.id = pos.id; }
           });
           g.addEventListener("pointermove", (evt) => {
             if (!dragging) return;
@@ -246,6 +348,21 @@ for (const f of formations) {
         else unclear++;
       });
       return { run, pass, unclear, total: run + pass };
+    }
+
+    function buildPctHtml(t) {
+      const rPct = t.total ? Math.round((t.run / t.total) * 100) : 0;
+      const pPct = t.total ? 100 - rPct : 0;
+      if (t.total === 0) {
+        return `<div class="rep-count">No confirmed outcome logged yet</div>`;
+      }
+      return `
+        <div class="pct-row">
+          <div class="pct run"><div class="p">${rPct}%</div><div class="l">Run</div></div>
+          <div class="pct pass"><div class="p">${pPct}%</div><div class="l">Pass</div></div>
+        </div>
+        <div class="rep-count">${t.total} confirmed rep${t.total === 1 ? "" : "s"}${t.unclear ? ` · ${t.unclear} unclear` : ""}</div>
+      `;
     }
 
     async function saveFormation(formationId, positions, statusEl) {
@@ -301,8 +418,6 @@ for (const f of formations) {
 
       group.formations.forEach((f) => {
         const t = tallyPlays(f.plays);
-        const rPct = t.total ? Math.round((t.run / t.total) * 100) : 0;
-        const pPct = t.total ? 100 - rPct : 0;
 
         const selection = { id: null };
         let editMode = false;
@@ -313,34 +428,33 @@ for (const f of formations) {
 
         const badgesHtml = f.badges.map((b) => `<span class="badge">${b}</span>`).join("");
 
-        let pctHtml;
-        if (t.total === 0) {
-          pctHtml = `<div class="rep-count">No confirmed outcome logged yet</div>`;
-        } else {
-          pctHtml = `
-            <div class="pct-row">
-              <div class="pct run"><div class="p">${rPct}%</div><div class="l">Run</div></div>
-              <div class="pct pass"><div class="p">${pPct}%</div><div class="l">Pass</div></div>
-            </div>
-            <div class="rep-count">${t.total} confirmed rep${t.total === 1 ? "" : "s"}${t.unclear ? ` · ${t.unclear} unclear` : ""}</div>
-          `;
-        }
+        let pctHtml = buildPctHtml(t);
 
-        const playsHtml = f.plays.map((p) => {
+        // Ensure every play has a stable id (older data may not have one).
+        let nextPlayId = Math.max(0, ...f.plays.map((p) => p.id || 0)) + 1;
+        f.plays.forEach((p) => { if (!p.id) p.id = nextPlayId++; });
+
+        function playRowHtml(p) {
           const outcomeClass = p.outcome === "unclear" ? "unclear" : p.outcome;
           const linkHtml = supportsDeepLink(p.game)
             ? `<a href="${videoLink(p.game, p.t)}" target="_blank" rel="noopener">▶ ${p.t}</a>`
             : `<span class="manual">${p.t} (seek manually) <a href="${videoLink(p.game, p.t)}" target="_blank" rel="noopener">open</a></span>`;
           return `
-            <div class="play-row">
+            <div class="play-row" data-play-id="${p.id}">
               <div class="left">
                 <span class="game-tag ${p.game}">${p.game}</span>
                 <span class="outcome ${outcomeClass}">${p.label}</span>
               </div>
-              ${linkHtml}
+              <div class="play-row-actions">
+                ${linkHtml}
+                <button class="tiny-btn" data-edit-play="${p.id}">✎</button>
+                <button class="tiny-btn danger" data-delete-play="${p.id}">×</button>
+              </div>
             </div>
           `;
-        }).join("");
+        }
+
+        const playsHtml = f.plays.map(playRowHtml).join("");
 
         card.innerHTML = `
           <div class="card-top">
@@ -367,10 +481,25 @@ for (const f of formations) {
             <button class="tool-action primary" data-done="1">Save &amp; Done</button>
             <span class="tool-hint">Drag a circle to move it — it'll snap to the grid. Click a circle, then "Remove Selected" to delete it.</span>
           </div>
-          ${pctHtml}
+          <div class="pct-wrap">${pctHtml}</div>
           <details>
             <summary>Timestamps (${f.plays.length})</summary>
             <div class="plays">${playsHtml}</div>
+            <button class="tiny-btn add-play-toggle" type="button">+ Add Play</button>
+            <form class="inline-form play-form" style="display:none;">
+              <select class="play-game-select">
+                ${GAMES.map((g) => `<option value="${g.tag}">${g.tag} — ${g.label}</option>`).join("")}
+              </select>
+              <input type="text" class="play-time-input" placeholder="Timestamp (M:SS)" required />
+              <select class="play-outcome-select">
+                <option value="run">Run</option>
+                <option value="pass">Pass</option>
+                <option value="unclear">Unclear / No play</option>
+              </select>
+              <input type="text" class="play-label-input" placeholder="Label (e.g. Run (L))" required />
+              <button type="submit" class="tool-action primary">Save Play</button>
+              <button type="button" class="tool-action play-cancel">Cancel</button>
+            </form>
           </details>
         `;
 
@@ -416,6 +545,113 @@ for (const f of formations) {
           selection.id = null;
           redraw();
           await saveFormation(f.id, f.positions, statusEl);
+        });
+
+        // ---- Play (timestamp) management ----
+        const playsListEl = card.querySelector(".plays");
+        const pctWrapEl = card.querySelector(".pct-wrap");
+        const summaryEl = card.querySelector("details summary");
+        const addPlayToggle = card.querySelector(".add-play-toggle");
+        const playForm = card.querySelector(".play-form");
+        const playGameSelect = card.querySelector(".play-game-select");
+        const playTimeInput = card.querySelector(".play-time-input");
+        const playOutcomeSelect = card.querySelector(".play-outcome-select");
+        const playLabelInput = card.querySelector(".play-label-input");
+        const playCancelBtn = card.querySelector(".play-cancel");
+        let editingPlayId = null;
+
+        function refreshPlaysUI() {
+          playsListEl.innerHTML = f.plays.map(playRowHtml).join("");
+          summaryEl.textContent = `Timestamps (${f.plays.length})`;
+          pctWrapEl.innerHTML = buildPctHtml(tallyPlays(f.plays));
+        }
+
+        function resetPlayForm() {
+          playForm.reset();
+          editingPlayId = null;
+          playForm.querySelector('button[type="submit"]').textContent = "Save Play";
+          playForm.style.display = "none";
+        }
+
+        addPlayToggle.addEventListener("click", () => {
+          const showing = playForm.style.display !== "none";
+          if (showing) { resetPlayForm(); return; }
+          editingPlayId = null;
+          playForm.querySelector('button[type="submit"]').textContent = "Save Play";
+          playForm.style.display = "flex";
+          playTimeInput.focus();
+        });
+        playCancelBtn.addEventListener("click", () => resetPlayForm());
+
+        playForm.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const t = playTimeInput.value.trim();
+          const game = playGameSelect.value;
+          const outcome = playOutcomeSelect.value;
+          const label = playLabelInput.value.trim();
+          if (!t || !label) return;
+
+          const previousPlays = f.plays.map((p) => ({ ...p }));
+          if (editingPlayId) {
+            const idx = f.plays.findIndex((p) => p.id === editingPlayId);
+            if (idx !== -1) f.plays[idx] = { ...f.plays[idx], t, game, outcome, label };
+          } else {
+            f.plays.push({ id: nextPlayId++, t, game, outcome, label });
+          }
+
+          const submitBtn = playForm.querySelector('button[type="submit"]');
+          submitBtn.disabled = true;
+          try {
+            const res = await fetch(`/api/formations/${f.id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ plays: f.plays }),
+            });
+            if (!res.ok) throw new Error((await res.json()).error || "Save failed");
+            refreshPlaysUI();
+            resetPlayForm();
+          } catch (err) {
+            f.plays = previousPlays; // revert on failure
+            alert("Couldn't save that play: " + err.message);
+          } finally {
+            submitBtn.disabled = false;
+          }
+        });
+
+        playsListEl.addEventListener("click", async (e) => {
+          const editId = e.target.getAttribute("data-edit-play");
+          const deleteId = e.target.getAttribute("data-delete-play");
+
+          if (editId) {
+            const p = f.plays.find((x) => String(x.id) === editId);
+            if (!p) return;
+            editingPlayId = p.id;
+            playGameSelect.value = p.game;
+            playTimeInput.value = p.t;
+            playOutcomeSelect.value = p.outcome;
+            playLabelInput.value = p.label;
+            playForm.querySelector('button[type="submit"]').textContent = "Update Play";
+            playForm.style.display = "flex";
+            playTimeInput.focus();
+          }
+
+          if (deleteId) {
+            if (!confirm("Delete this play?")) return;
+            const previousPlays = f.plays.map((p) => ({ ...p }));
+            f.plays = f.plays.filter((p) => String(p.id) !== deleteId);
+            try {
+              const res = await fetch(`/api/formations/${f.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ plays: f.plays }),
+              });
+              if (!res.ok) throw new Error((await res.json()).error || "Delete failed");
+              refreshPlaysUI();
+            } catch (err) {
+              f.plays = previousPlays;
+              alert("Couldn't delete that play: " + err.message);
+            }
+          }
         });
 
         cardsWrap.appendChild(card);

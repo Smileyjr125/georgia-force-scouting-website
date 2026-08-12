@@ -40,6 +40,7 @@ export interface TeamDTO {
 
 // Shape of a game (a piece of film for a team) entry.
 export interface GameDTO {
+  id: string;
   tag: string;            // short code used in play data, e.g. "AUG"
   label: string;
   videoPlatform: "youtube" | "nfhs" | "other";
@@ -100,6 +101,7 @@ export async function getGamesForTeam(teamId: string): Promise<GameDTO[]> {
     limit: 1000,
   } as any);
   return entries.items.map((item: any) => ({
+    id: item.sys.id,
     tag: item.fields.tag,
     label: item.fields.label,
     videoPlatform: item.fields.videoPlatform,

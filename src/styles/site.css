@@ -169,13 +169,15 @@
     border-radius:8px;
     padding:10px;
     margin-bottom:14px;
-    height:190px;
+    width:100%;
+    aspect-ratio:340/200;
     position:relative;
+    box-sizing:border-box;
   }
   .formation-box svg{
     width:100%;
     height:100%;
-    max-width:340px;
+    display:block;
   }
   .formation-box.editing{
     background:rgba(26,77,156,.09);
@@ -462,3 +464,105 @@
   transition:background .15s;
 }
 .add-formation-card:hover{background:rgba(26,77,156,.08) !important;}
+
+.games-panel{
+  background:var(--card);
+  border:1px solid var(--card-border);
+  border-radius:10px;
+  padding:14px 18px;
+  margin-bottom:24px;
+}
+.games-panel summary{
+  cursor:pointer;
+  font-family:'Oswald',sans-serif;
+  text-transform:uppercase;
+  letter-spacing:.5px;
+  font-size:14px;
+  list-style:none;
+}
+.games-panel summary::-webkit-details-marker{display:none;}
+.games-panel summary::before{content:"▸ "; color:var(--blue);}
+.games-panel[open] summary::before{content:"▾ ";}
+#games-list{margin-top:14px; display:flex; flex-direction:column; gap:6px;}
+.game-row{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+  background:rgba(26,77,156,.04);
+  border-radius:6px;
+  padding:8px 10px;
+  font-size:12.5px;
+}
+.game-row-tag{
+  font-family:'JetBrains Mono',monospace;
+  font-weight:700;
+  background:var(--blue);
+  color:var(--white);
+  border-radius:4px;
+  padding:2px 6px;
+  font-size:11px;
+}
+.game-row-label{font-weight:600;}
+.game-row-platform{
+  color:var(--chalk-dim);
+  text-transform:uppercase;
+  font-size:10px;
+  letter-spacing:.5px;
+}
+.game-row-url{
+  color:var(--blue);
+  text-decoration:none;
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px;
+  max-width:220px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.game-row-url:hover{text-decoration:underline;}
+
+.tiny-btn{
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px;
+  font-weight:600;
+  padding:3px 8px;
+  border-radius:5px;
+  border:1px solid var(--blue);
+  background:var(--white);
+  color:var(--blue);
+  cursor:pointer;
+  flex-shrink:0;
+}
+.tiny-btn:hover{background:rgba(26,77,156,.08);}
+.tiny-btn.danger{border-color:#b00020; color:#b00020;}
+.tiny-btn.danger:hover{background:rgba(176,0,32,.06);}
+
+.inline-form{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  align-items:center;
+  margin-top:12px;
+}
+.inline-form input, .inline-form select{
+  padding:7px 9px;
+  border:1.5px solid rgba(26,77,156,.35);
+  border-radius:6px;
+  font-size:12.5px;
+  font-family:'Inter',sans-serif;
+}
+.play-form{
+  margin-top:10px;
+  padding-top:10px;
+  border-top:1px dashed var(--card-border);
+}
+.play-form input, .play-form select{flex:1; min-width:110px;}
+
+.play-row-actions{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex-shrink:0;
+}
+.add-play-toggle{margin-top:10px;}
